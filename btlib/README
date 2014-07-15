@@ -1,0 +1,95 @@
+
+
+/*
+         (C) Copyright, 1988, 1989 Marcus J. Ranum
+                    All rights reserved
+
+
+          This software, its documentation,  and  supporting
+          files  are  copyrighted  material  and may only be
+          distributed in accordance with the terms listed in
+          the COPYRIGHT document.
+*/
+
+TO COMPILE::
+	edit btconf.h as necessary to reflect your system/preferences.
+	edit Makefile to fix any necessary flags.
+
+TO INSTALL::
+	only btree.h and the library need to be placed in user-accessible
+	locations.
+
+TO TEST::
+	build the library and check out the testing functions in ../utils.
+	if there is a catastrophic failure, you're on your own.
+
+Contents::
+btree.h		- needed by anything using the btree code. defines various
+		constants and macros, as well as forward declarations.
+btconf.h	- put system specific configuration stuff here. this file
+		contains compile-time options settings and system macros.
+btintern.h	- NEVER include this in user level code unless you know
+		bloody well what you're about. this file contains the
+		internal page structures and mystical secret stuff that
+		should never need to be edited.
+btclose.c	- function to close a btree.
+btdelete.c	- function to delete a key from a btree.
+bterrors.c	- error strings and bt_perror().
+btfind.c	- function to locate a key in a btree.
+btgoto.c	- function to go to first/last key of btree.
+btinsert.c	- insert function.
+btio.c		- cache manipulation routines, also functions for syncing
+		buffers, writing superblocks, and allocating and freeing
+		new pages.
+btlabel.c	- functions for manipulating a label hidden in free space
+		between first page and the end of the superblock.
+btload.c	- function for optimal load of reverse sorted keys.
+btopen.c	- simple btree opening function that doesn't provide much
+		in the way of options.
+btoopen.c	- btree opening function that provides access to every
+		option supported by the library. uses varargs and will
+		not compile on machines without varargs.
+btpage1.c	- first half of the internal page manipulation routines.
+		contains page search functions, page insert, and page
+		split.
+btpage2.c	- second half of the internal page manipulation routines.
+		contains page delete function, and a function to grab a
+		specific key/ptr pair out of a page.
+btravrs.c	- function to scan forward/backwards in btree.
+btseek.c	- internal function that navigates to leaf level. called
+		in bt_insert(), bt_delete(), bt_find(), etc.
+btzap.c		- function that resets an index.
+
+Notes:
+1) stdio.h is not included in every module, and should not be. Unfortunately
+I had to include it for NULL and BUFSIZ in a couple of places, but I hate
+having it wasting space when I compile stuff.
+
+2) btpage1.c and btpage2.c are separate because of the hairy use of macros
+and symbols that makes it hard to fit in the memory of a small compiler.
+please keep them separate.
+
+3) static functions: I normally would make 99% of these functions static
+so they would not clutter up the name space, BUT, because of compiler
+space constraints on my Amiga, and the fact that I want to be able to
+use the page handling code in record management, I need access to them
+externally. please do not change this. (though I may make a version of
+this library that IS all staticed out, and all the code is in one BIG
+module. ick, poo.)
+
+4) library size: all these modules are carefully arranged so that no
+extraneous functions will get linked in (if your linker is not totally
+dead-brained). Please do not destroy that, since, IMHO, libraries should
+never give you more than you need.
+
+To Do:
+1) make (if possible) the page insertion and manipulation routines
+more portable. I simply don't know how to do this myself, so anyone
+who knows how is invited to tell me!
+
+2) It would be nice if there was an EFFICIENT way to tell the tree to
+store records off the leaves. This could be really bad, if it was not
+implemented properly, though. If someone does this, or wants to, let
+me know.
+
+--mjr();

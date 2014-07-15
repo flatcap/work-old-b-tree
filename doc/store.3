@@ -1,0 +1,511 @@
+.\"
+.\"         (C) Copyright, 1988, 1989 Marcus J. Ranum
+.\"                    All rights reserved
+.\"
+.\"
+.\"          This software, its documentation,  and  supporting
+.\"          files  are  copyrighted  material  and may only be
+.\"          distributed in accordance with the terms listed in
+.\"          the COPYRIGHT document.
+.\"
+.\" $Header: /atreus/mjr/hacks/btree/doc/RCS/store.3,v 1.2 89/10/23 16:06:04 mjr Rel $
+.\"
+.TH STORE 3 "18 October 1989"
+.SH NAME
+store \- variable length record storage and management routines
+.SH SYNOPSIS
+.B #include <sys/types.h>
+.br
+.B #include <store.h>
+.sp
+.LP
+.B "sto_ptr store_alloc(st,bytes)"
+.br
+.B "STORE *st;"
+.br
+.B "int bytes;"
+.LP
+.B "int store_close(st)"
+.br
+.B "STORE *st;"
+.LP
+.B "int store_copy(st,record1,record2)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record1;"
+.br
+.B "sto_ptr record2;"
+.LP
+.B "int store_decrefcnt(st,record)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.LP
+.B "int store_free(st,record)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.LP
+.B "int store_gethdr(st,record,hdr)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.br
+.B "struct sto_hdr hdr;"
+.LP
+.B "int store_increfcnt(st,record)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.LP
+.B "int store_linkafter(st,record,predecessor)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.br
+.B "sto_ptr predecessor;"
+.LP
+.B "int store_linkbefore(st,record,next)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.br
+.B "sto_ptr next;"
+.LP
+.B "STORE *store_open(file,flags,mode)"
+.br
+.B "char *file;"
+.br
+.B "int flags;"
+.br
+.B "int mode;"
+.LP
+.B "void store_perror(st,string)"
+.br
+.B "STORE *st;"
+.br
+.B "char *string;"
+.LP
+.B "int store_puthdr(st,record,hdr)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.br
+.B "struct sto_hdr hdr;"
+.LP
+.B "int store_read(st,record,offset,buf,siz,rsiz)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.br
+.B "off_t offset;"
+.br
+.B "unsigned char *buf;"
+.br
+.B "int siz;"
+.br
+.B "int *rsiz;"
+.LP
+.B "int store_realloc(st,record,newbytes)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.br
+.B "int newbytes;"
+.LP
+.B "sto_ptr store_reallocbuf(st,newsize)"
+.br
+.B "STORE *st;"
+.br
+.B "int newsize;"
+.LP
+.B "int store_unlink(st,record)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.LP
+.B "int store_write(st,record,offset,buf,bytes)"
+.br
+.B "STORE *st;"
+.br
+.B "sto_ptr record;"
+.br
+.B "off_t offset;"
+.br
+.B "unsigned char *buf;"
+.br
+.B "int bytes;"
+.SH DESCRIPTION
+.LP
+The record storage library is intended to provide a reasonably simple
+low-level record allocation and manipulation package. Functions are
+provided for allocating, deallocating, reallocating, copying, and linking
+records into lists. Basic functions are also provided for performing
+I/O to records with the ability to update complete or partial records.
+Free space management is based on first fit without garbage collection.
+.LP
+The interface to the library is intended to somewhat evoke 
+.B "malloc()"
+et. al., with a typedef'd data type
+.B sto_ptr
+being the "address" of a storage record (in this case, the offset of
+the record header in the disk file). The library is constructed in
+several layers, the lowest handling accessing and modifying the record
+headers, stored data, and storage allocation. Another layer is built
+upon the basic routines, managing copying data, reallocation and resizing
+of records, and linked list management. The library is constructed so
+that a minimal price is paid for features not used, so programmers can
+work at whatever level suits their needs.
+.LP
+With each record, an internal count is kept of the number of bytes in
+use within the record (the record's size) and the actual allocated size
+of the record (the record's allocation). Reads and writes may adjust the
+record's size, but only allocation or reallocation can affect the
+record's allocation.
+.SH FUNCTIONS
+.LP
+.B "sto_ptr store_alloc(store,bytes)"
+.br
+The
+.B store_alloc
+function allocates a record space of
+.B bytes
+size and returns the address of the record, or 
+.B STO_NULL
+if the allocation failed.
+.LP
+.B "store_close(store)"
+.br
+This function closes a store file.
+.LP
+.B "store_copy(store,rec1,rec2)"
+.br
+This function copies the data in record
+.B rec1
+into
+.B rec2,
+which must have been previously allocated, and must be large enough to
+contain the contents of
+.B rec1.
+If
+.B rec2
+has data already allocated in it, and
+.B rec1
+does not completely over-write
+.B rec2
+the size of the record remains whatever size
+.B rec2
+already held. This allows a record to be "overlaid" on another, similarly
+to
+.B "bcopy(3)"
+and its effect on memory. If
+.B rec2
+had not actually had any data written into it, the size of the record's
+contents will be set as that of
+.B rec1.
+.LP
+.B "store_decrefcnt(store,record)"
+.br
+This function decrements the reference counter of the record by one.
+The reference count can go below zero. Reference counts do not currently
+have much effect on records, however
+.B "store_free()"
+will not free a record with a reference count greater than zero, though
+it will decrement it automatically, and return as if the operation had
+completed correctly.
+.LP
+.B "store_gethdr(store,record,hdr)"
+.br
+This function reads the header of the record specified in
+.B record,
+and places the results in
+.B hdr.
+This function performs some additional checks to try to ensure that
+the record is a valid one, including checking a magic number stored
+in the header.
+.LP
+.B "store_increfcnt(store,record)"
+.br
+This function increments the reference counter of the record by one.
+.LP
+.B "store_linkafter(store,record,predecessor)"
+.br
+This function places the record
+.B record
+into a linked list after the record
+.B predecessor
+and adjusts and links that may have already existed between
+.B predecessor
+and any other records linked after it.
+If
+.B record
+is already linked into a list, those links are \fBnot\fR broken before
+the link-in is performed. This permits appending two chains together,
+but also makes it possible to destroy a chain by inserting a record
+without unlinking it from its siblings. Careful management of the 
+linked lists is the user's responsibility. If a call is made to
+.B store_free
+or
+.B store_realloc
+the links are unlinked, or adjusted appropriately, if they exist.
+.LP
+.B "store_linkbefore(store,record,next)"
+.br
+This function links the record before the record specified as
+.B next.
+.LP
+.B "STORE *store_open(file,flags,mode)"
+.br
+This function allocates a new store file handle, with the pathname
+specified by
+.B file.
+The flags specified in
+.B flags
+and the mode specified in
+.B mode
+are passed to
+.B "open(2)".
+.LP
+.B "void store_perror(store,string)"
+.br
+This function prints an error string
+.B string
+associated with store file
+.B store
+on the standard error, if there is an error flag set for that store
+file. If there is no error flag set, and a system error number is
+set in 
+.B errno
+the library call
+.B "perror(3)"
+is called instead.
+.LP
+.B "int store_puthdr(store,record,hdr)"
+.br
+This function writes the header stored in
+.B hdr
+into the record header for
+.B record.
+.LP
+.B "int store_read(store,record,offset,buf,size,rsiz)"
+.br
+This function reads the data stored in record
+.B record,
+starting from offset
+.B offset
+relative to the beginning of the record. The returned data is
+placed in
+.B buf,
+up to a maximum of
+.B size, 
+and the number of bytes read is returned in
+.B rsiz.
+If there was more data in the record than could fit in
+.B buf,
+.B size
+bytes is read into
+.B buf,
+and 
+.B store_read
+returns the constant
+.B STO_MORE
+to indicate that there is more data to read.
+.LP
+.B "sto_ptr store_realloc(store,record,newbytes)"
+.bt
+This function allocates a new record of size
+.B newbytes
+and copies the contents of
+.B record
+into it, returning the new record pointer, or
+.B STO_NULL
+in the event of a failure.
+.LP
+.B "int store_reallocbuf(store,newsize)"
+.br
+This function is used to manipulate the size of the internal
+buffer used by the record store, to allocate more memory for it
+if needed. This is used in the
+.B btdbm
+library to stretch the buffer to adapt to user data.
+.LP
+.B "int store_unlink(store,record)"
+.br
+This function breaks any linked list pointers for
+.B record
+and re-connects them as necessary to fill the record's gap.
+.LP
+.B "int store_write(store,record,offset,buf,bytes)"
+.br
+This function will write
+.B bytes
+from 
+.B buf
+into record
+.B record
+starting at offset
+.B offset
+relative to the beginning of the record. If the write cannot fit into
+the space allocated for the record,
+.B STO_ERR
+is returned. If the write places more of the record's allocated space
+into use, the record header will be adjusted appropriately. This function
+can be used to over-write parts of a record, as well as entire records,
+so that each record can be treated somewhat like a small file in its
+own right. 
+.SH "MACROS"
+.LP
+Since these values are all macros, they should be used only with
+caution, to avoid side-effects. Mostly these should not be used by
+user-level code, but providing a common interface seemed better
+than the alternative.
+.LP
+.B "(int) store_errno(store)"
+.br
+points to the error number associated with the storage file.
+.LP
+.B "(void) store_clearerr(store)"
+.br
+clears the error number associated with the storage file.
+.LP
+.B "(int) store_fileno(store)"
+.br
+points to the file descriptor of the storage file.
+.LP
+.B "(unsigned char *) store_buffer(store)"
+.br
+points to the internal buffer of the storage file. This can be used
+(wisely) as a buffer in which to store record data temporarily, but
+it may be changed without warning by any of the store library or
+btdbm library functions.
+.LP
+.B "(int) store_bufsiz(store)"
+.br
+points to an integer value that is the current maximum size of the
+internal buffer.
+.LP
+.B "(sto_ptr) store_currec(store)"
+.br
+points to a temporary area in which the current record can be stored.
+Any calls to the btdbm library or the store library may change this
+value. (NOT USED CURRENTLY).
+.LP
+.B "(sto_ptr) store_label(store)"
+.br
+points to a special record value that can be used to store data file
+specific information. Currently neither the store or btdbm libraries
+use this value. It is initially not allocated, and must be allocated
+and set before using. In all other ways, it is treated just like any
+other record. The intent is to allow a place to store static schema
+information, etc.
+.SH EXAMPLES
+.nf
+.na
+.ft C
+	STORE	*p;
+	struct	froozum	stuff;
+	sto_ptr	rec;
+	int	i;
+
+	p = store_open("foo.dat",O_CREAT,0600);
+
+	if(p != NULL) {
+		rec = store_alloc(p,sizeof(struct froozum));
+		if(rec == STO_NULL) {
+			store_perror(p,"cannot allocate record");
+			exit(1);
+		}
+
+		i = store_write(p,rec,0L,(unsigned char *)&stuff,sizeof(stuff))
+		if(i != STO_OK) {
+			store_perror(p,"cannot store stuff");
+			exit(1);
+		}
+	}
+.ft R
+.fi
+.ad
+.LP
+The above would open \fIfoo.dat\fR with mode 0600, and would create
+the file if it did not already exist. A record is allocated with enough
+room to fit a data structure, which is then stored.
+.SH "SEE ALSO"
+.SH "INTERNAL FUNCTIONS"
+.LP
+The following functions are internal functions used by the store library.
+Care should be taken to avoid declaring functions with names that clash:
+.B store_wsuper
+.LP
+In general, all the store library functions and macros are prefixed with
+.B store_...
+and constants with
+.B STO_...
+.SH DIAGNOSTICS
+.LP
+The value
+.B STO_OK
+is returned whenever a function is successful.
+.LP
+The value
+.SM
+.B STO_ERR
+is returned to indicate some form of failure in any operation performed on 
+a valid
+.B STORE.
+All valid storage file handles contain their own error number that is set to
+indicate the cause of a failure, and can be accessed with the macro
+.B "store_errno(store)"
+(where
+.B store
+is a valid store file). A function 
+.B "store_perror(store,string)"
+(where 
+.B string
+is a character pointer and
+.B store
+is a valid store file) is provided, which prints an appropriate error
+message on the standard error.
+Additionally, access to the error strings is available through the
+external array
+.B "store_errs[]".
+Constant value codes for each error are defined in
+.B store.h
+for symbolic reference.
+.LP
+The value
+.SM
+.B NULL
+is returned to indicate that a
+.SM
+.B STORE
+pointer has not been initialized properly.
+.SH BUGS
+.LP
+The facilities for managing linked lists is very primitive. Ideally, more
+work should be done behind the scenes by the library, rather than forcing
+the user to handle link consistency.
+.LP
+A lot is left to the user's discretion.
+.SH LIMITATIONS
+.LP
+A record can be arbitrarily large, though it will take longer to copy
+and reallocate longer records. The way in which the
+.B store_read
+and 
+.B store_write
+functions are implemented allows reasonably flexible manipulation of even
+large amounts of storage in a record.
+.SH AUTHOR
+.LP
+Marcus J. Ranum

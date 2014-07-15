@@ -1,0 +1,832 @@
+.\"
+.\"         (C) Copyright, 1988, 1989 Marcus J. Ranum
+.\"                    All rights reserved
+.\"
+.\"
+.\"          This software, its documentation,  and  supporting
+.\"          files  are  copyrighted  material  and may only be
+.\"          distributed in accordance with the terms listed in
+.\"          the COPYRIGHT document.
+.\"
+.\" $Header: /atreus/mjr/hacks/btree/doc/RCS/btree.3,v 1.4 89/10/23 15:37:43 mjr Rel $
+.\"
+.TH B\+TREE 3 "30 September 1989"
+.SH NAME
+b+tree \- variable length b+tree index management package
+.SH SYNOPSIS
+.B #include <sys/types.h>
+.br
+.B #include <btree.h>
+.sp
+.LP
+.B "BT_INDEX bt_open(path,flags,mode)"
+.br
+.B "char *path;"
+.br
+.B "int flags;"
+.br
+.B "int mode;"
+.LP
+.B #include <varargs.h>
+.br
+.B "BT_INDEX bt_optopen(va_alist)"
+.LP
+.B "int bt_delete(btree,key,len)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp key;"
+.br
+.B "int len;"
+.LP
+.B "int bt_find(btree,key,len,rrn)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp key;"
+.br
+.B "int len;"
+.br
+.B "off_t *rrn;"
+.LP
+.B "int bt_goto(btree,d)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "int d; /* BT_EOF or BT_BOF */"
+.LP
+.B "int bt_insert(btree,key,len,rrn,dupflg)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp key;"
+.br
+.B "int len;"
+.br
+.B "off_t rrn;"
+.br
+.B "int dupflg;"
+.LP
+.B "int bt_traverse(btree,d,kbuf,maxlen,retlen,retrrn)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "int d; /* BT_EOF or BT_BOF */"
+.br
+.B "bt_chrp kbuf;"
+.br
+.B "int maxlen;"
+.br
+.B "int *retlen;"
+.br
+.B "off_t *retrrn;"
+.LP
+.B "void bt_perror(btree,s)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "char *s;"
+.LP
+.B "int bt_rlabel(btree,buf,siz)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp buf;"
+.br
+.B "int siz;"
+.LP
+.B "int bt_wlabel(btree,buf,siz)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp buf;"
+.br
+.B "int siz;"
+.LP
+.B "int bt_sync(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "int bt_close(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "int bt_load(btree,key,len,rrn,flag)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp key;"
+.br
+.B "int len;"
+.br
+.B "off_t rrn;"
+.br
+.B "int flag; /* either BT_BOF, BT_OK, or BT_EOF */"
+.LP
+.B "int bt_zap(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "The following are macros:"
+.LP
+.B "(int) bt_fileno(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "(int) bt_pagesiz(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "(int) bt_dtype(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "(*int)() bt_cmpfn(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "(int) bt_errno(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "(void) bt_clearerr(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "(int) BT_MAXK(btree)"
+.br
+.B "BT_INDEX *btree;"
+.LP
+.B "(int) BT_LABSIZ(btree)"
+.br
+.B "BT_INDEX *btree;"
+.SH DESCRIPTION
+.LP
+The b+tree library implements a variable-length key variable page size b+tree.
+A variety of options are supported, including user-settable cache modes,
+cache sizes, user defined data types, and several system defined data types.
+Support for variable length string keys with automatic prefixing is built
+in. The library does \fINOT\fR support any means of data storage for anything
+more than keys - for that the user must have access to a record management
+library (such as
+.B "store(3)"
+or
+.B "btdbm(3)"
+\).
+.LP
+The b+tree library stores all keys as variable length blocks of
+unsigned chars, and associates a \fIRemote Record Number (RRN)\fP
+with each key. This is defined as the typedef
+.B off_t
+and is typically used to store a disk address of a record someplace
+else in secondary storage. There is no provision for storing more
+associated data than the \fIRRN\fP in the index.
+The typedef
+.B bt_chrp
+is provided to increase portability and should be used in preference to
+a char pointer, though they may really be the same type. 
+.SH "INITIALIZING A B+TREE"
+.LP
+When a b+tree is opened, an attempt is made to read a block of information
+at the beginning of the file which contains parameters such as page size, etc.
+If no bytes are read, indicating the file is empty, this is
+taken as an indication that the file should be initialized, and a new b+tree
+is created. To prevent confusion, a variety of checks are made, including
+verifying that a magic number is correct, and that any parameters provided
+make sense. If the open succeeds, a pointer to a dynamically allocated
+b+tree index is returned. In the event of an error, a NULL pointer is
+returned.
+.LP
+If an existing b+tree is re-opened, the information in the header block
+may override any options from the user, if appropriate. Thus, if a b+tree
+has already been created with one page size, attempts to use a different
+page size are politely ignored.
+.SH "OPENING A B+TREE"
+.LP
+There are two functions provided for opening a b+tree. The first,
+.B "bt_open()"
+is intended to look like the
+.B "open(2)"
+system call, and assumes that the caller wishes to open a b+tree with
+all the default options. These defaults are built into the library,
+and set the page size to some reasonable value in view of the system buffer
+size, cache size to some reasonable value, cache modes to something
+conservative, and the b+tree data type to string.
+.LP
+The second function for opening a b+tree,
+.B "bt_optopen()"
+allows a user to set a larger variety of options. The interface to the
+function is through a variable length argument list, terminated by a
+zero. Each of the arguments is interpreted in sequence as a request
+for a specific parameter in the b+tree to be set.
+Each request may be followed by one
+or more arguments, depending on the specific request. Omission of an
+argument, or the terminating zero will result in disaster. Not all of
+the request are required, and if the request is omitted, the default
+will be taken. Those marked as mandatory must be provided.
+.LP
+.B "Options to bt_optopen()"
+.LP
+.I BT_PATH:
+This option must be followed by a null-terminated string specifying the
+path name of the file to open. \fIThis value must be provided\fR.
+.LP
+.I BT_PSIZE:
+This option must be followed by an integer value indicating the desired
+page size to use. The default is to use a value based on the system
+buffer size.
+.LP
+.I BT_CACHE:
+This option must be followed by an integer value specifying the number
+of cache buffers to use in addition to
+the minimum number of cache buffers required for scratch pages. The
+default is to use a reasonable sized cache, which should be adequate.
+.LP
+.I BT_CFLAG:
+This option must be followed by a flag value which specifies the manner
+in which cache buffers are to be handled. The permitted values are
+defined as
+.I BT_NOCACHE
+.I BT_ROCACHE
+or
+.I BT_RWCACHE
+standing for (respectively) no cache, read-only cache, and read-write
+cache. The effects of these values is as follows: When no cache is
+indicated, pages are read from disk every time a read request is issued,
+and are written to disk with every write request. The minimal existing
+cache buffers are still required for splitting and insertion, but data
+is never taken from them. When read-only cache is in effect, reads may
+be returned directly out of cache, but all page write requests are still 
+flushed immediately to disk. This means that programs which exit suddenly
+for some reason or another need be less concerned about whether or not
+the b+tree index has been flushed. The read-write cache option allows
+pages to be written directly into cache, where they are only flushed to
+disk when expired, or the tree is closed. This mode should save some
+time when building an index in batch mode. At any time, the
+.B "bt_sync()"
+function can be called to flush any modified pages to disk. Closing
+a b+tree also flushes the cache.
+.LP
+.I BT_OMODE:
+This option must be followed by an integer value which is used as flags
+to the 
+.B "open(2)"
+system call.
+.LP
+.I BT_OPERM:
+This option must be followed by an integer value which is passed to the
+.B "open(2)"
+system call as the permissions information.
+.LP
+.I BT_MAGIC:
+This option must be followed by a long value which is used as the
+magic number for the b+tree. This replaces the default value. One
+side-effect of setting this value is that the correct value \fImust\fR
+be provided again if the tree is re-opened.
+.LP
+.I BT_DTYPE:
+This option must be followed by a flag value indicating the type of
+data that is being stored in the index. The permitted values are
+defined as
+.I BT_STRING
+.I BT_INT
+.I BT_LONG
+.I BT_FLOAT
+and
+.I BT_USRDEF
+meaning either string, integer, long, float, or user-defined. The string
+data type is the default, and there are functions built into the tree
+that improve string performance. Depending on the system architecture,
+the compiler, etc, you may have trouble with floats, ints, and longs,
+as well as user-defined data, due to alignment problems. This can be
+gotten around only in system-specific ways, so no solution is offered
+here.
+.LP
+If the
+.I BT_USRDEF
+flag is passed, another value must be passed as well, being a pointer
+to a function returning an integer - the comparison function. This
+function is expected to be called as:
+.br
+.B "(*cmpf)(key1,length1,key2,length1);"
+.br
+where \fIkey1\fR is the first key, and \fIlength1\fR is its length,
+and \fIkey2\fR is the second key, with \fIlength2\fR as its length.
+The function is expected to return zero if the two keys are equal
+in sort order, a value less than zero if the first key is less than
+the second key, and a value greater than zero if the first key is
+greater than the second. when using the user-defined data structures,
+since the keys may be variable-length, the user is responsible for
+structure alignment and other nasties. As long as the keys are a multiple
+of the system word size, there should be no alignment problems.
+.LP
+.I BT_LABEL:
+This option must be followed by a character pointer and an integer
+value. The character pointer is used as a label, and is stored in
+some spare space at the end of the b+tree file header. The integer
+value must contain the length of the label being provided. If there
+is insufficient room in the b+tree file header, an error will result.
+The label can also be read and set using the
+.B "bt_rlabel()"
+and
+.B "bt_wlabel()"
+functions.
+.SH "BT_OPTOPEN EXAMPLES"
+.nf
+.na
+.ft C
+	BT_INDEX	*p;
+
+	p = bt_optopen(	BT_PATH, "test.dat",
+			BT_MODE, 0600,
+			BT_OMODE, O_CREAT|O_TRUNC,
+			BT_CFLAG, BT_RWCACHE,
+			0);
+.ft R
+.fi
+.ad
+.LP
+The above would open \fItest.dat\fR with mode 0600, and would create
+or truncate an existing file. Since the file will be truncated, a new
+b+tree index will be initialized. The data type of the index will be
+the default, as will the cache size. The cache, however, has been
+flagged to not immediately flush pages to disk on write.
+.br
+.sp
+.nf
+.na
+.ft C
+	BT_INDEX	*p;
+	extern		int	mycompare();
+
+	p = bt_optopen(	BT_PATH, "test2.dat",
+			BT_DTYPE, BT_USRDEF, mycompare,
+			BT_PSIZE, (BUFSIZ * 2),
+			BT_LABEL, "foo", 3,
+			0);
+.ft R
+.fi
+.ad
+.LP
+The above would open \fItest2.dat\fR with page size of double the system
+buffer size. The data type stored is indicated to be user-defined, and
+a comparison function
+.B "mycompare()"
+is provided to compare keys. The b+tree index is labeled \fIfoo\fR for
+mysterious reasons.
+.SH "OTHER B+TREE FUNCTIONS"
+.LP
+.B "int bt_delete(btree,key,len)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp key;"
+.br
+.B "int len;"
+.br
+This function will search for the key and delete it from the index. If the
+key is not present in the index, the value
+.B BT_NF
+is returned. 
+.LP
+.B "int bt_find(btree,key,len,rrn)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp key;"
+.br
+.B "int len;"
+.br
+.B "off_t *rrn;"
+.br
+This function will search for the key and store the data pointer in
+.B rrn,
+returning
+.B BT_NF
+if the key is not present in the index. The current location in the
+index is stored to "point" to the located key, or to the key
+where it should have been if it was not present.
+.LP
+.B "int bt_goto(btree,d)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "int d; /* BT_EOF or BT_BOF */"
+.br
+This function will move the current b+tree location to either the
+highest key in the tree or the lowest, depending on the value in
+.B d.
+If the value is
+.B BT_EOF
+the locator will be moved to the highest key in the tree, if it is
+.B BT_BOF
+the locator moves to the lowest key. The current location in the
+index is stored if the call is successful.
+.LP
+.B "int bt_insert(btree,key,len,rrn,dupflg)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp key;"
+.br
+.B "int len;"
+.br
+.B "off_t rrn;"
+.br
+.B "int dupflg;"
+.br
+This function inserts the key in an index, with the data pointer
+value in
+.B rrn.
+Duplicate keys are not supported, and
+.B BT_ERR
+will be returned if an attempt is made to insert a duplicate value,
+unless
+.B dupflg
+is non-zero, in which case the value in
+.B rrn
+is used to replace the value currently stored in the index as a 
+data pointer. This operation is more efficient than deleting a key
+and re-inserting it, and should be used where changing the
+data pointer is desired. When a new key is inserted in the index,
+the current location in the index is invalidated. Thus, inserting a
+key and calling
+.B bt_traverse
+will cause a seek to the beginning or the end of the index.
+.LP
+.B "int bt_traverse(btree,d,kbuf,maxlen,retlen,retrrn)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "int d; /* BT_EOF or BT_BOF */"
+.br
+.B "bt_chrp kbuf;"
+.br
+.B "int maxlen;"
+.br
+.B "int *retlen;"
+.br
+.B "off_t *retrrn;"
+.br
+This function will move forward or backwards across the keys in the
+tree, depending on the value in
+.B d.
+If the value in 
+.B d
+is
+.B BT_EOF
+the traverse will move towards the high end of the index, if it is
+.B BT_BOF
+the traverse will move towards the low end. If the traverse is
+successful, the next (or previous) key is placed in
+.B kbuf,
+the data pointer in
+.B retrrn,
+and the length of the key is stored in
+.B retlen.
+.B maxlen
+is checked to ensure that there is sufficient room in the user-provided
+buffer for the key, to prevent overruns. If an overrun would occur, the
+function returns
+.B BT_ERR
+and
+.B bt_errno
+for the index is set to
+.B BT_BTOOSMALL.
+If the end of the index is encountered, and the traverse can proceed no
+further, the value
+.B BT_EOF
+is returned by the function, or
+.B BT_BOF
+is returned if the beginning of the index is reached. If the current
+location in the index is undefined at the time of the call to
+.B bt_traverse
+a 
+.B bt_goto
+is performed to the \fIopposite\fR end of the index from the direction
+in which the traverse is being performed. In this way, a tree can be
+opened and dumped by simply performing successive calls to
+.B bt_traverse.
+.LP
+.B "void bt_perror(btree,s)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "char *s;"
+.br
+This function prints out any error messages currently associated with
+the index, in the manner of the
+.B "perror(3)"
+function. If there is no current error detected in the index, and a
+system error is present in
+.B errno,
+.B perror
+is called with the string
+.B s.
+.LP
+.B "int bt_rlabel(btree,buf,siz)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp buf;"
+.br
+.B "int siz;"
+.br
+This function reads the label from the index and places it in
+.B buf,
+checking the value of
+.B siz
+to ensure there is enough room. Note that the software keeps no count of
+how many bytes of data are in the label.
+.LP
+.B "int bt_wlabel(btree,buf,siz)"
+.br
+.B "BT_INDEX *btree;"
+.br
+.B "bt_chrp buf;"
+.br
+.B "int siz;"
+.br
+This function writes the contents of
+.B buf,
+to the index label, consisting of 
+.B siz
+bytes.
+.LP
+.B "int bt_sync(btree)"
+.br
+.B "BT_INDEX *btree;"
+.br
+This function causes any dirty cache buffers in the index buffer cache to
+be flushed to disk.
+.LP
+.B "int bt_close(btree)"
+.br
+This function closes a b+tree index and frees all dynamically allocated
+memory.
+.LP
+.B "int bt_load(btree,key,len,rrn,flag)"
+.br
+This function performs an optimal in-order load of a set of keys. The keys
+must be presented in \fBREVERSE\fP sort order. The advantages this function
+confers are several, and it should be used any time an index is being
+bulk-loaded, or is being rebuilt. When an index is built with
+.B bt_load
+the pages are filled in descending order, rather than through random
+access search as in
+.B bt_insert.
+Additionally, each page is filled to capacity, which means that less space
+is taken up for the index, and less time is required to search the index.
+For large indices, the benefit of occasionally optimizing the index by
+rebuilding it with
+.B bt_load
+cannot be sufficiently emphasized. Storage savings up up to 50% can be
+realized, and search efficiency can be improved considerably.
+.LP
+To use
+.B bt_load,
+the function must first be called on an empty index, or one that is
+disposable, with the
+.B key,
+.B len,
+and
+.B rrn
+values equal to zero. The
+.B flag
+argument must be
+.B BT_BOF
+indicating that the file is to be initialized.
+This causes the tree to be re-initialized through a call to
+.B bt_zap.
+Once the first call the
+.B bt_load
+has been made, any number of subsequent calls can be made, with
+.B key,
+.B len,
+and
+.B rrn
+values to insert in the index. The
+.B flag
+argument should be set to
+.B BT_OK
+to indicate that the keys are valid keys.
+After all the keys have been inserted, a final call to
+.B bt_load
+must be made, with the
+.B key,
+.B len,
+and
+.B rrn
+equal to zero again, and the
+.B flag
+argument equal to
+.B BT_EOF
+indicating that the end of the load has been reached. At that time,
+further clean-up is performed, and the new b+tree index can be used
+normally.
+.LP
+For purposes of performance in running
+.B bt_load
+having a reasonable sized cache (about 3 spare pages) and the cache
+flags set to
+.B BT_RWCACHE
+will reduce load times. Increasing the cache by more than a
+moderate amount will not drastically improve load times, since the
+index is not searched during inserts.
+.LP
+During any of the calls to
+.B bt_load
+if an error condition is encountered, the usual
+.B BT_ERR
+will be returned. If the error is anything more serious than an
+oversized key, or zero-length key, the index will be unusable.
+.LP
+.B "int bt_zap(btree)"
+.br
+This function resets the b+tree index to an empty state, while retaining
+any set values for page size, etc. Note that this function will only free
+disk space that has been allocated on systems that have the
+.B "ftruncate(2)"
+system call. In order to free disk space on systems that do not
+have
+.B ftruncate
+the index file must be unlinked and re-created.
+.SH "MACROS"
+.LP
+Since these values are all macros, they should be used only with
+caution, to avoid side-effects. Mostly these should not be used by
+user-level code, but providing a common interface seemed better
+than the alternative.
+.LP
+.B "bt_fileno(btree)"
+points to the file descriptor (integer value) of the index. Users should not
+fiddle with this unless they know what they're about.
+.LP
+.B "bt_pagesiz(btree)"
+points to the size (integer value) of the b+tree index pages.
+.LP
+.B "bt_dtype(btree)"
+points to the data type if the index. It will be one of the values
+discussed in opening a b+tree.
+.LP
+.B "bt_cmpfn(btree)"
+points to the comparison function used by user-defined data type b+trees.
+It is possible to reset this on the fly, though the results are not under
+warranty.
+.LP
+.B "bt_errno(btree)"
+points to the integer error number value. Definitions of the error codes
+are in
+.B "btree.h".
+.LP
+.B "bt_clearerr(btree)"
+resets the index error value to indicate there is no error. This is
+performed automatically after every successful function call.
+.LP
+.B "BT_MAXK(btree)"
+yields an integer value that gives the largest possible size that a
+key can be, given the page size of the b+tree. This size is actually
+smaller than the largest size of a key that can really be fit in a
+page, but is calculated to reliably permit even splitting and promotion.
+.LP
+.B "BT_LABSIZ(btree)"
+yields an integer value that gives the largest possible amount of
+space that can be used for an index label.
+.SH "SEE ALSO"
+.SH "INTERNAL FUNCTIONS"
+.LP
+The following functions are internal functions used by the b+tree library.
+Care should be taken to avoid declaring functions with names that clash:
+.B bt_delpg,
+.B bt_dump,
+.B bt_freepage,
+.B bt_genprx,
+.B bt_inspg,
+.B bt_keyof,
+.B bt_newpage,
+.B bt_requeue,
+.B bt_rpage,
+.B bt_seekdown,
+.B bt_splpg,
+.B bt_srchpg,
+.B bt_wpage,
+.B bt_wsuper
+.LP
+In general, all the b+tree functions
+and macros are prefixed with
+.B bt_...
+and constants with
+.B BT_...
+.SH DIAGNOSTICS
+.LP
+The value
+.B BT_OK
+is returned whenever a function is successful.
+.LP
+The value
+.SM
+.B BT_ERR
+is returned to indicate some form of failure in any operation performed on 
+a valid
+.B BT_INDEX.
+All valid b+tree indices contain their own error number that is set to
+indicate the cause of a failure, and can be accessed with the macro
+.B "bt_errno(btindex)"
+(where
+.B btindex
+is a valid b+tree index). A function 
+.B "bt_perror(btindex,string)"
+(where 
+.B string
+is a character pointer and
+.B btindex
+is a valid b+tree index) is provided, which prints an appropriate error
+message on the standard error. If the error is not b+tree-related, any
+existing system messages apropos existing conditions are printed by
+calling
+.B "perror()"
+Additionally, access to the error strings is available through the
+external array
+.B "bt_errs[]".
+Constant value codes for each error are defined in
+.B btree.h
+for symbolic reference.
+.LP
+Errors are cleared after every successful call to a function. They can
+also be cleared using the
+.B "bt_clearerr()"
+macro.
+.LP
+The value
+.SM
+.B NULL
+is returned to indicate that a
+.SM
+.B BT_INDEX
+pointer has not been initialized properly. Since no valid
+.B BT_INDEX
+is returned, 
+.B "bt_perror()"
+cannot be used to determine the nature of an error.
+.LP
+The values
+.B BT_EOF
+and
+.B BT_BOF
+are returned if a call to
+.B "bt_traverse()"
+reaches the end or beginning of the index.
+.LP
+The value
+.B BT_NF
+is returned if a call to
+.B "bt_find()"
+fails to find the requested key, but encounters no error.
+.SH BUGS
+.LP
+There may be problems with pointer alignment on some architectures,
+especially if arbitrary structure alignment is not supported.
+.LP
+Due to the alignment problem, users defining their own data types must
+be careful to keep them of such a size that they align well, depending
+on architecture. Fixed-size user-defined structures will probably 
+benefit by being padded out to some alignment boundary. Variable-size
+user-defined structures should perform thier own padding, even if
+it requires wasting some space.
+.SH LIMITATIONS
+.LP
+Every effort has been made to eliminate gratuitous limitations. There
+is no built-in limit to the depth allowed a tree, as an internal stack
+is maintained dynamically. There is no built-in limit to page sizes,
+numbers of keys, etc, except those inherent in the
+architecture. There is no fixed size to the internal cache, though
+there is a fixed minimum that will always be allocated for use as
+scratch buffers for page splitting, etc. When not being used as such,
+they are used to cache disk pages. Assume that at least 4 buffers
+will always be allocated.
+.SH ALGORITHMS
+.LP
+The algorithms used are basically the standard b+tree algorithm as
+described in countless texts. Some shortcuts are made. Since the
+keys can be variable length, the order of the tree is, perforce,
+variable. Splitting tries to fill roughly 1/2 of each page during
+a split, but with a deliberate bias towards the lower page in the
+split, since that is the one which may give up a key for promotion
+if the page is an internal one. Unlike some b+trees that have two
+different page structures for internal and leaf pages, this library
+uses the same structure for both, since no data is stored in the
+leaf. There is minor wastage as a result, but the size of the
+object code is kept down.
+.LP
+Deletes are not implemented in accordance
+with the b+tree algorithm, in that pages are not combined as they
+empty, nor are keys redistributed.  A result is that search performance
+does not improve much as a tree empties, though it does not get
+worse either. Another side-effect is that while pages may empty out,
+if the index is re-filled, the inserts will be more efficient,
+since the likelihood of having to split a page drops. These assumptions
+hold true as long as the data is roughly randomly distributed across
+its range.
+.SH AUTHOR
+.LP
+Marcus J. Ranum

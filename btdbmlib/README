@@ -1,0 +1,71 @@
+
+
+/*
+         (C) Copyright, 1988, 1989 Marcus J. Ranum
+                    All rights reserved
+
+
+          This software, its documentation,  and  supporting
+          files  are  copyrighted  material  and may only be
+          distributed in accordance with the terms listed in
+          the COPYRIGHT document.
+*/
+
+
+	A few words about the arrangement of these modules::
+
+Contents::
+Makefile	- obvious.
+README		- obvious.
+btdbm.h		- header for btree-based dbm clone.
+btdbmclose.c	- close function for btree-based dbm clone.
+btdbmdelete.c	- delete function.
+btdbmfetch.c	- fetch function.
+btdbmfirstkey.c	- first key function.
+btdbmnextkey.c	- key traversal function.
+btdbmopen.c	- open function.
+btdbmstore.c	- store function.
+stalloc.c	- storage allocation function.
+stclose.c	- storage file close function.
+stcopy.c	- storage file record copy/duplication function.
+stdecref.c	- storage file record reference count decrement fnction.
+sterrs.c	- storage file error strings file, and perror functions.
+stfree.c	- storage file free list manager. cryptic.
+stgethed.c	- storage file record header reader.
+stincref.c	- storage file record reference count increment fnction.
+stlinka.c	- storage file linked-list management "link after" function.
+stlinkb.c	- storage file linked-list management "link before" function.
+stoconf.h	- configuration information for storage file library.
+stointern.h	- internal macros for storage file library. not user level.
+stopen.c	- storage file opening/initialization function.
+store.h		- main header for storage file library.
+stputhed.c	- storage file record header updater.
+stread.c	- storage file "read-like" function.
+strealloc.c	- storage file record reallocation/copy function.
+stunlink.c	- storage file linked-list management unlink function.
+stwrite.c	- storage file "write-like" function.
+stwsuper.c	- storage file super-block updater function.
+
+Notes:
+	There is some sleazy semi-optimization in the write/read routines,
+since the header is read before the read or write, we know we don't have to
+re-seek before we actually do the read. This saves us a seek, so we do it,
+though if the layout of the record headers changes, things will get evil.
+
+	For a detailed description of how the free list is managed, see
+stfree.c
+
+
+To Do:
+1) Possibly add some form of record header caching. The current way makes
+too many system calls (about 4 per operation).
+
+2) Possibly add some form of file seek caching as well. Storing the location
+of the file pointer might save a few system calls.
+
+3) improve the btdbm library to use linked lists for multiple records with
+the same key.
+
+4) improve the btdbm library to use more of the b+tree functionality.
+
+--mjr();

@@ -1,0 +1,222 @@
+B-tree algorithms
+
+A B-tree is a data structure that maintains an ordered set of data and
+allows efficient operations to find, delete, insert, and browse the data. In
+this discussion, each piece of data stored in a B-tree will be called a
+"key", because each key is unique and can occur in the B-tree in only one
+location.
+
+A B-tree consists of "node" records containing the keys, and pointers that
+link the nodes of the B-tree together.
+
+Every B-tree is of some "order n", meaning nodes contain from n to 2n keys,
+and nodes are thereby always at least half full of keys. Keys are kept in
+sorted order within each node. A corresponding list of pointers are
+effectively interspersed between keys to indicate where to search for a key
+if it isn't in the current node. A node containing k keys always also
+contains k+1 pointers.
+
+For example, here is a portion of a B-tree with order 2 (nodes have at least
+2 keys and 3 pointers). Nodes are delimited with [square brackets]. The keys
+are city names, and are kept sorted in each node. On either side of every
+key are pointers linking the key to subsequent nodes:
+
+Start here
+           | 
+           v 
+           [ Chicago Hoboken ]  
+            |       |       | 
++-----------+       |       +------------+
+|                   |                    |
+v                   v                    v
+[ Aptos Boston ]    [ Denver Detroit ]   [ San-Jose Seattle ]
+ |     |      |      |      |       |     |        |       |
+ v     v      v      v      v       v     v        v       v
+                     X
+
+To find the key "Dallas", we begin searching at the top "root" node.
+"Dallas" is not in the node but sorts between "Chicago" and "Hoboken", so we
+follow the middle pointer to the next node. Again, "Dallas" is not in the
+node but sorts before "Denver", so we follow that node's first pointer down
+to the next node (marked with an "X"). Eventually, we will either locate the
+key, or encounter a "leaf" node at the bottom level of the B-tree with no
+pointers to any lower nodes and without the key we want, indicating the key
+is nowhere in the B-tree.
+
+Below is another fragment of an order 1 B-tree (nodes have at least 1 key
+and 2 pointers). Searching for the key "Chicago" begins at "Marin", follows
+the first pointer to "Aptos" (since Chicago sorts before Marin), then
+follows that node's second pointer down to the next level (since Chicago
+sorts after Aptos), as marked with an "X".
+
+| 
+          v 
+      [ Marin ]  
+       |     |
+    +--+     +---+
+    |            |
+    v            v
+[ Aptos ]   [ Seattle ]
+ |     |     |       |
+ v     v     v       v 
+       X
+
+Searching a B-tree for a key always begins at the root node and follows
+pointers from node to node until either the key is located or the search
+fails because a leaf node is reached and there are no more pointers to
+follow.
+
+B-trees grow when new keys are inserted. Since the root node initially
+begins with just one key, the root node is a special exception and the only
+node allowed to have less than n keys in an order n B-tree.
+
+Here is an order 2 B-tree with integer keys. Except for the special root
+node, order 2 requires every node to have from 2 to 4 keys and 3 to 5
+pointers. Empty slots are marked with ".", showing where future keys have
+not yet been stored in the nodes:
+
+[ 57 . . .]
+                        |  |
+        +---------------+  +---------------------+
+        |                                        |
+        v                                        v
+        [ 14 40 . .]                             [ 72 84 . .]
+         |  |  |                                  |  |  |
++--------+  |  +----------+            +----------+  |  +-----------+
+|           |             |            |             |              |
+v           v             v            v             v              v
+[01 12 . .] [15 16 17 .]  [47 56 . .]  [58 60 61 .]  [74 75 76 78]  [85 86 99 .]
+
+To insert the key "59", we first simply search for that key. If 59 is found,
+the key is already in the tree and the insertion is superfluous. Otherwise,
+we must end up at a leaf node at the bottom level of the tree where 59 would
+be stored. In the above case, the leaf node contains 58, 60, 61, and room
+for a fourth key, so 59 is simply inserted in the leaf node in sorted order:
+
+[58 59 60 61]
+
+Now we'll insert the key "77". The initial search leads us to the leaf node
+where 77 would be inserted, but the node is already full with 4 keys: 74,
+75, 76, and 78. Adding another key would violate the rule that order 2
+B-trees can't have more than 4 keys. Because of this "overflow" condition,
+the leaf node is split into two leaf nodes. The leftmost 2 keys are put in
+the left node, the rightmost 2 keys are put in the right node, and the
+middle key is "promoted" by inserting it into the parent node above the
+leaf. Here, inserting 77 causes the 74-75-76-78 node to be split into two
+nodes, and 76 is moved up to the parent node that contained 72 and 84:
+
+Before inserting 77           After inserting 77
+
+[ 72 84 . .]                    [ 72 76 84 .]
+ |  |  |                         |  |  |  |
+-+  |  +-                      --+  |  |  +--
+    |                               |  |
+    |                          +----+  +------+
+    |                          |              |
+    v                          v              v
+    [74 75 76 78]              [74 75 . .]    [77 78 . .]
+
+In this case, the parent node contained only 2 keys (72 and 84), leaving
+room for 76 to be promoted and inserted. But if the parent node was also
+already full with 4 keys, then it too would have to split. Indeed, splitting
+may propagate all the way up to the root node. When the root splits, the
+B-tree grows in height by one level, and a new root with a single promoted
+key is formed. (A situation when an order n root node sometimes has fewer
+than n keys, just like the situation described earlier when the root node
+stores the very first key placed in the B-tree.)
+
+B-trees shrink when keys are deleted. To delete a key, first perform the
+usual search operation to locate the node containing the key. (If the key
+isn't found, it isn't in the tree and can't be deleted.)
+
+If the found key is not in a leaf, move it to a leaf by swapping the key
+with the logical "next" key. In a B-tree, the "next" key is always the first
+key in the leftmost leaf of the right subtree.
+
+For example, in this B-tree we want to delete "37", which is not in a leaf.
+"xx" indicates key values that don't matter:
+
+[ xx 37 xx xx ]
+       |
+       |
+       +->[ xx xx xx xx ]
+           |
+           |
+           +->[ xx xx xx xx ]
+               |
+               |
+               +->[41 43 . .]
+
+We follow the pointer immediately to the right of 37 to find 37's right
+subtree, then follow the leftmost pointers in each subnode until we reach a
+leaf. The first key in the leaf is "41", the logical "next" key after 37 in
+the list of all keys in the tree. By swapping 37 and 41, we can move 37 to a
+leaf node to set up a deletion without violating the key order or pointer
+order of the overall B-tree.
+
+Once the key we want is in a leaf, we can delete it. If at least n keys
+remain in the node, we're done, otherwise it is an "underflow", since every
+node (except the root) must have at least n keys.
+
+If a node underflows, we may be able to "redistribute" keys by borrowing
+some from a neighboring node. For example, in the order 3 B-tree below, the
+key 67 is being deleted, which causes a node to underflow since it only has
+keys 66 and 88 left. So keys from the neighbor on the left are "shifted
+through" the parent node and redistributed so both leaf nodes end up with 4
+keys:
+
+Before deleting 67                         After deleting 67
+
+     [ xx 55 xx ]                               [ xx 33 xx ]
+         |  |                                       |  |
++--------+  +--------+                     +--------+  +------+
+|                    |                     |                  |
+v                    v                     v                  v
+[22 24 26 28 33 44]  [66 67 88 . . .]      [22 24 26 28 . .]  [44 55 66 88 . .]
+
+But if the underflow node and the neighbor node have less than 2n keys to
+redistribute, the two nodes will have to be combined. For example, here key
+52 is being deleted from the B-tree below, causing an underflow, and the
+neighbor node can't afford to give up any keys for redistribution. So one
+node is discarded, and the parent key moves down with the other keys to fill
+up a single node:
+
+Before deleting 52          After deleting 52
+
+  [ 35 45 55 . ]              [ 35 55 . . ]
+   |  |  |  |                  |  |  |
+  -+  |  |  +-                -+  |  +-
+      |  |                        |
++-----+  +---+                    |
+|            |                    |
+v            v                    v
+[40 42 . .]  [50 52 . .]          [40 42 45 50]
+
+In the above case, moving the key 45 out of the parent node left two keys
+(35 and 55) remaining. But if the parent node only had n keys to begin with,
+then the parent node also would underflow when the parent key was moved down
+to combine with the leaf key. Indeed, underflow and the combining of nodes
+may propagate all the way up to the root node. When the root underflows, the
+B-tree shrinks in height by one level, and the nodes under the old root
+combine to form a new root.
+
+The payoff of the B-tree insert and delete rules are that B-trees are always
+"balanced". Searching an unbalanced tree may require traversing an arbitrary
+and unpredictable number of nodes and pointers.
+
+An unbalanced tree of 4 nodes              A balanced tree of 4 nodes
+
+[ x x ]                                             [ x x ]
+    |                                                | | |
+    [ x x ]                                   +------+ | +------+
+        |                                     |        |        |
+        [ x x ]                               [ x x ]  [ x x ]  [ x x ]
+            |
+            [ x x ]
+
+Searching a balanced tree means that all leaves are at the same depth. There
+is no runaway pointer overhead. Indeed, even very large B-trees can
+guarantee only a small number of nodes must be retrieved to find a given
+key. For example, a B-tree of 10,000,000 keys with 50 keys per node never
+needs to retrieve more than 4 nodes to find any key.
+

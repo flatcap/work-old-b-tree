@@ -1,0 +1,233 @@
+.\"
+.\"         (C) Copyright, 1988, 1989 Marcus J. Ranum
+.\"                    All rights reserved
+.\"
+.\"
+.\"          This software, its documentation,  and  supporting
+.\"          files  are  copyrighted  material  and may only be
+.\"          distributed in accordance with the terms listed in
+.\"          the COPYRIGHT document.
+.\"
+.\" $Header: /atreus/mjr/hacks/btree/doc/RCS/btdbm.3,v 1.2 89/10/23 18:31:00 mjr Rel $
+.\"
+.TH BTDBM 3 "18 October 1989"
+.SH NAME
+btdbm \- ndbm-like library with a b+tree index
+.SH SYNOPSIS
+.B #include <sys/types.h>
+.br
+.B #include <btdbm.h>
+.sp
+.LP
+.B "int btdbm_close(db)"
+.br
+.B "BTDBM *db;"
+.LP
+.B "int btdbm_delete(db,key)"
+.br
+.B "BTDBM *db;"
+.br
+.B "btdatum key;"
+.LP
+.B "btdatum btdbm_fetch(db,key)"
+.br
+.B "BTDBM *db;"
+.br
+.B "btdatum key;"
+.LP
+.B "btdatum btdbm_firstkey(db)"
+.br
+.B "BTDBM *db;"
+.LP
+.B "btdatum btdbm_nextkey(db)"
+.br
+.B "BTDBM *db;"
+.LP
+.B "BTDBM *btdbm_open(path,type,flags,mode)"
+.br
+.B "char *path;"
+.br
+.B "int type; /* from btree.h b+tree types */"
+.br
+.B "int flags;"
+.br
+.B "int mode;"
+.LP
+.B "int btdbm_store(db,key,data,flag)"
+.br
+.B "BTDBM *db;"
+.br
+.B "btdatum key;"
+.br
+.B "btdatum data;"
+.br
+.B "int flag;"
+.SH DESCRIPTION
+.LP
+The
+.B btdbm
+library is a rough emulation of the 
+.B "ndbm(3)"
+library built on top of the
+.B "b+tree(3)"
+and
+.B "store(3)"
+libraries. The functions are intended to be as close to plug-compatible as
+possible, except for the
+.B btdbm_open
+function, which requires a data type flag to maintain order of the keys.
+Unlike the hash table library, the
+.B btdbm
+allows ordered access of the data by key, however the performance of the
+.B btdbm
+library will be inferior to that of the
+.B "ndbm(3)"
+library, due to both the speed of hash tables, and the fact that the
+.B "store(3)"
+library is not optimized for speed. The typedef
+.B btdatum
+is provided, which is analogous to the 
+.B dbm
+.B datum
+typedef.
+.SH FUNCTIONS
+.LP
+.B "int btdbm_close(db)"
+.br
+This function closes and deallocates a 
+.B BTDBM
+pointer, closing the storage file and b+tree index.
+.LP
+.B "int btdbm_delete(db,key)"
+.br
+This function deletes the key from the database.
+.LP
+.B "btdatum btdbm_fetch(db,key)"
+.bt
+This function looks up the datum stored under
+.B key
+and returns the result in a
+.B btdatum.
+If the key is not located in the tree, the value
+.B "btdatum.size"
+of the returned datum will be zero.
+.LP
+.B "btdatum btdbm_firstkey(db)"
+.br
+This function returns the first data record from the database, in sort
+order according to the type of data stored in the b+tree index.
+.LP
+.B "btdatum btdbm_nextkey(db)"
+.br
+This function returns the next key in order from the database. The next
+key will be the key following either the key returned from the last call
+to
+.B btdbm_firstkey,
+or
+.B btdbm_fetch.
+.LP
+.B "BTDBM *btdbm_open(path,type,flags,mode)"
+.br
+This function opens a database and index. The file name is specified 
+in
+.B path
+with the data file automatically having a \fB".dat"\fR extension added,
+and the b+tree index having a \fB".ndx"\fR added. The value in
+.B type
+is passed to the underlying b+tree to indicate the type of key used
+for sorting. It must be one of:
+.B BT_STRING,
+.B BT_INT,
+.B BT_LONG,
+.B BT_FLOAT.
+The
+.B flags
+argument is passed to
+.B "open(2)"
+and the
+.B mode
+argument is used as the creation mode for the file, if it does not
+already exist.
+.LP
+.B "int btdbm_store(db,key,data,flag)"
+.br
+This function stores the data in
+.B data
+keyed with the datum in
+.B key.
+If the value of
+.B flag
+is
+.B BTDBM_INSERT
+and the key already exists, and error is returned. If the value of
+.B flag
+is
+.B BTDBM_REPLACE
+any existing data stored under
+.B key
+is overwritten with the new data.
+.SH "MACROS"
+.LP
+Since these values are all macros, they should be used only with
+caution, to avoid side-effects. Mostly these should not be used by
+user-level code, but providing a common interface seemed better
+than the alternative.
+.LP
+.B "(int) btdbm_error(db)"
+.br
+points to the error number associated with the database.
+.LP
+.B "(void) btdbm_clearerror(db)"
+.br
+clears any error number associated with the database.
+.LP
+.B "(BT_INDEX *) btdbm_btree(db)"
+.br
+Points to the underlying b+tree handle used to store the keys. See
+.B "b+tree(3)".
+.LP
+.B "(STORE *) btdbm_storefile(db)"
+.br
+Points to the underlying store file handle used to store the data. See
+.B "store(3)".
+.SH "SEE ALSO"
+.LP
+.B "ndbm(3)"
+.br
+.B "b+tree(3)"
+.br
+.B "store(3)"
+.SH DIAGNOSTICS
+.LP
+The value
+.B 0
+is returned whenever a function is successful.
+.LP
+The value
+.SM
+.B 1
+is returned to indicate some form of failure in any operation.
+There is no provision for a more complete means of returning
+error codes, however, the error values in the store file and
+b+tree can be accessed through their respective pointers using
+.B btdbm_btree
+and
+.B btdbm_storefile.
+.LP
+A failed call to 
+.B btdbm_open
+returns NULL. Failed calls to the functions that return a
+btdatum return a btdatum with size value set equal to zero.
+.SH BUGS
+.SH LIMITATIONS
+.LP
+Data stored under a key can be arbitrarily large, subject to the limits
+of the underlying store file. Since the store file's internal buffer will
+stretch to accomodate large data, reasonably large amounts of data can
+be successfully stored and retrieved fairly efficiently. Keys stored in
+the b+tree index are subject to limits in the b+tree library. An individual
+key cannot be longer than permitted by the underlying page size of the
+b+tree (typically a fairly large value).
+.SH AUTHOR
+.LP
+Marcus J. Ranum

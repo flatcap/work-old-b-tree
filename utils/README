@@ -1,0 +1,65 @@
+
+
+/*
+         (C) Copyright, 1988, 1989 Marcus J. Ranum
+                    All rights reserved
+
+
+          This software, its documentation,  and  supporting
+          files  are  copyrighted  material  and may only be
+          distributed in accordance with the terms listed in
+          the COPYRIGHT document.
+*/
+
+	The test program "btflog.sh" is a good way of seeing if
+the btree routines work on your system. for the first test runs
+you may wish to edit some of the parameters at the top of btflog.sh
+- or just type "make flog" and watch.
+
+
+
+Contents::
+Makefile	- self explanatory.
+
+README		- this.
+
+btest.c		- test harness and btree debugger (of sorts). this
+		program breaks a lot of rules, by making use of 
+		some of the internal b+tree functions. at least
+		if you're going to do it, you'll have some examples.
+		Do NOT use btest as a means of judging the speed
+		of the library, since the input-interpreting
+		routines in it are pretty slow.
+
+dbtest.c	- test harness for the dbm-clone library built on
+		the store library.
+
+rectest.c	- test harness for the store library.
+
+flog.sh		- a bourne shell script that pounds an index or two on
+		its head by having randwords make a list of garbage, and
+		then inserting it, deleting it, and so on.
+
+words.c		- junk word maker for btree test rack.
+
+btoptim.c	- a simple program that copies one index out, in
+		reverse sort order, and does an optimal load
+		of the index into a new one.
+
+testrack.c	- test driver containing several different tests,
+		each of which tries to match the expected state of
+		the tree against the real state, and so on. the
+		key values to change when flogging the code are the
+		number and length of random words to insert, and
+		the page size of the test trees.
+
+Notes:
+		the code in btest.c uses a few icky hackerish tricks,
+		but is intended to be simple to use and follow. I
+		tried to pretty well do one of everything, to provide
+		examples.
+
+To Do:
+		??
+
+--mjr();

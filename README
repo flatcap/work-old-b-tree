@@ -1,0 +1,41 @@
+
+	This is the source code for a variable-length key variable
+page size b+tree library. Also included is source for a variety of
+test programs, a semi-useable record manager, and a dbm-lookalike
+library built on top of the record manager and b+tree. (dbm(3) will
+blow it away performance-wise, of course).
+
+	This software has been tested (and works) on the following:
+Pyramid/OSx, Sun4/SunOs, Sun3/SunOs, Digital Vax/BSD4.3,
+Digital DECstation3100/Ultrix
+
+	This software has been tested and found NOT to work on the
+following:
+SCO Xenix - I have no idea why because I don't have one
+
+
+Contents::
+----------------------------------------------------------------------
+COPYRIGHT	- licensing/copyright notice. read it, please.
+
+Makefile	- makefile
+
+btlib		- source for the b+tree library. directions for
+		compilation are in btlib/README.
+
+doc		- manual pages for the b+tree library
+
+btdbmlib	- source for a sort of record management library
+		that is pretty much of a "toy" library, and will
+		probably not cut it for serious projects unless it
+		is beefed-up a bit. Also includes source for a 
+		dbm-clone library that uses b+tree indexes.
+		the record manager was designed for an application
+		I wrote that demanded being able to store things
+		of practically any size, and did not require high
+		performance. if you are trying to write a real
+		database, please don't waste your time even looking
+		at it.
+
+utils		- utility programs and toys, including test-rack
+		software for the b+tree
